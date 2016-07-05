@@ -1,5 +1,6 @@
 from migen import *
 
+from itertools import product
 from misoc.cores.spi import SPIMaster
 
 SPI_DATA_ADDR, SPI_XFER_ADDR, SPI_CONFIG_ADDR = range(3)
@@ -63,7 +64,7 @@ def _test_gen(bus):
     yield from _test_xfer(bus, 0b01, 0, 32, 0x12345678)
     print(hex((yield from _test_read(bus, SPI_PENDING))))
     print(hex((yield from _test_read(bus, SPI_ACTIVE))))
-    return
+    # return
     for cpol, cpha, lsb, clk in product(
             (0, 1), (0, 1), (0, 1), (0, 1)):
         yield from bus.write(SPI_CONFIG_ADDR,
@@ -72,15 +73,16 @@ def _test_gen(bus):
                              SPI_DIV_READ(clk))
         for wlen, rlen, wdata in product((0, 8, 32), (0, 8, 32),
                                          (0, 0xffffffff, 0xdeadbeef)):
-            rdata = (yield from _test_xfer(bus, 0b1, wlen, rlen, wdata, True))
+            yield from _test_xfer(bus, 0b1, wlen, rlen, wdata)
+            rdata = (yield from _test_read(bus))
             len = (wlen + rlen) % 32
             mask = (1 << len) - 1
             if lsb:
                 shift = (wlen + rlen) % 32
             else:
                 shift = 0
-            a = (wdata >> wshift) & wmask
-            b = (rdata >> rshift) & rmask
+            a = (wdata >> shift) & mask
+            b = (rdata >> shift) & mask
             if a != b:
                 print("ERROR", end=" ")
             print(cpol, cpha, lsb, clk, wlen, rlen,

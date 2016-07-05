@@ -1,3 +1,7 @@
+from migen import *
+
+from misoc.cores.spi import SPIMaster
+
 SPI_DATA_ADDR, SPI_XFER_ADDR, SPI_CONFIG_ADDR = range(3)
 (
     SPI_OFFLINE,

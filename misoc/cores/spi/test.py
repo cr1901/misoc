@@ -57,7 +57,7 @@ def _test_xfer(wbus, cbus, cs, wlen, rlen, wdata):
 
 
 def _test_read(wbus, cbus, sync=SPI_ACTIVE | SPI_PENDING):
-    while (yield from cbus.read(13)) & sync:
+    while (yield from cbus.read(12)) & sync:
         pass
     return ((yield from cbus.read(0)) << 24 |
             (yield from cbus.read(1)) << 16 |
@@ -66,11 +66,11 @@ def _test_read(wbus, cbus, sync=SPI_ACTIVE | SPI_PENDING):
 
 
 def _test_gen(wbus, cbus):
-    yield from cbus.write(12, 0*SPI_CLK_POLARITY |
+    yield from cbus.write(11, 0*SPI_CLK_POLARITY |
                          1*SPI_CLK_PHASE | 0*SPI_LSB_FIRST |
                          1*SPI_HALF_DUPLEX)
-    yield from cbus.write(14, 3) # W
-    yield from cbus.write(15, 5) # R
+    yield from cbus.write(13, 3) # W
+    yield from cbus.write(14, 5) # R
     yield from _test_xfer(wbus, cbus, 0b01, 4, 0, 0x90000000)
     print(hex((yield from _test_read(wbus, cbus))))
     yield from _test_xfer(wbus, cbus, 0b10, 0, 4, 0x90000000)

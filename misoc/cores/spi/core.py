@@ -315,9 +315,6 @@ class SPIMaster(Module, AutoCSR):
             spi.reg.lsb.eq(config.lsb_first),
             spi.div_write.eq(config.div_write),
             spi.div_read.eq(config.div_read),
-
-            If(self._data_write.re == 1,
-                pending.eq(1)),
         ]
         self.sync += [
             If(spi.done,

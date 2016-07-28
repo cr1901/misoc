@@ -325,7 +325,8 @@ class SPIMaster(Module, AutoCSR):
             clock_width=len(config.div_read),
             bits_width=len(xfer.read_length))
 
-        pending = Signal()
+        pending0 = Signal(1)
+        pending = Signal(1)
         cs = Signal.like(xfer.cs)
         data_read = Signal.like(spi.reg.data)
         data_write = Signal.like(spi.reg.data)
@@ -342,6 +343,14 @@ class SPIMaster(Module, AutoCSR):
             spi.reg.lsb.eq(configc.lsb_first),
             spi.div_write.eq(self._clk_div_write.storage),
             spi.div_read.eq(self._clk_div_read.storage),
+
+            If(self._data_write.re,
+                pending.eq(1)
+            ).
+            Else(
+                pending.eq(pending0)
+            ),
+            statusc.pending.eq(pending),
         ]
         self.sync += [
             If(spi.done,
@@ -352,7 +361,7 @@ class SPIMaster(Module, AutoCSR):
                 spi.bits.n_write.eq(self._xfer_len_write.storage),
                 spi.bits.n_read.eq(self._xfer_len_read.storage),
                 spi.reg.data.eq(self._data_write.storage),
-                pending.eq(0),
+                pending0.eq(0),
             ),
             # wb.ack a transaction if any of the following:
             # a) reading,
@@ -370,11 +379,10 @@ class SPIMaster(Module, AutoCSR):
             ),
 
             If(self._data_write.re == 1,
-                pending.eq(1),
+                pending0.eq(1),
             ),
 
             statusc.active.eq(spi.cs),
-            statusc.pending.eq(pending),
         ]
 
         # I/O

@@ -36,14 +36,14 @@ def SPI_READ_LENGTH(i):
     return i << 24
 
 
-def _test_xfer(bus, cs, wlen, rlen, wdata):
+def _test_xferw(bus, cs, wlen, rlen, wdata):
     yield from bus.write(SPI_XFER_ADDR, SPI_CS(cs) |
                          SPI_WRITE_LENGTH(wlen) | SPI_READ_LENGTH(rlen))
     yield from bus.write(SPI_DATA_ADDR, wdata)
     yield
 
 
-def _test_read(bus, sync=SPI_ACTIVE | SPI_PENDING):
+def _test_readw(bus, sync=SPI_ACTIVE | SPI_PENDING):
     while (yield from bus.read(SPI_CONFIG_ADDR)) & sync:
         pass
     return (yield from bus.read(SPI_DATA_ADDR))
@@ -54,16 +54,17 @@ def _test_gen(bus):
                          1*SPI_CLK_PHASE | 0*SPI_LSB_FIRST |
                          1*SPI_HALF_DUPLEX |
                          SPI_DIV_WRITE(3) | SPI_DIV_READ(5))
-    yield from _test_xfer(bus, 0b01, 4, 0, 0x90000000)
-    print(hex((yield from _test_read(bus))))
-    yield from _test_xfer(bus, 0b10, 0, 4, 0x90000000)
-    print(hex((yield from _test_read(bus))))
-    yield from _test_xfer(bus, 0b11, 4, 4, 0x81000000)
-    print(hex((yield from _test_read(bus))))
-    yield from _test_xfer(bus, 0b01, 8, 32, 0x87654321)
-    yield from _test_xfer(bus, 0b01, 0, 32, 0x12345678)
-    print(hex((yield from _test_read(bus, SPI_PENDING))))
-    print(hex((yield from _test_read(bus, SPI_ACTIVE))))
+    yield from _test_xferw(bus, 0b01, 4, 0, 0x90000000)
+    print(hex((yield from _test_readw(bus))))
+    yield from _test_xferw(bus, 0b10, 0, 4, 0x90000000)
+    print(hex((yield from _test_readw(bus))))
+    yield from _test_xferw(bus, 0b11, 4, 4, 0x81000000)
+    print(hex((yield from _test_readw(bus))))
+    yield from _test_xferw(bus, 0b01, 8, 32, 0x87654321)
+    yield from _test_xferw(bus, 0b01, 0, 32, 0x12345678)
+    print(hex((yield from _test_readw(bus, SPI_PENDING))))
+    print(hex((yield from _test_readw(bus, SPI_ACTIVE))))
+    return
 
 
     for cpol, cpha, lsb, clk in product(
@@ -76,13 +77,13 @@ def _test_gen(bus):
                                          (0, 0xffffffff, 0xdeadbeef,
                                           0x5555aaaa)):
             xfer_len = wlen + rlen
-            yield from _test_xfer(bus, 0b1, wlen, rlen, wdata)
+            yield from _test_xferw(bus, 0b1, wlen, rlen, wdata)
             if cpha == 1 and xfer_len == 0:
                 expected_rdata = rdata # Write will not register.
                                        # Use prev rdata.
             else:
                 expected_rdata = _simulate_shifts(wdata, xfer_len, lsb, 32)
-            rdata = (yield from _test_read(bus))
+            rdata = (yield from _test_readw(bus))
             if expected_rdata != rdata:
                 print("ERROR", end=" ")
             print(cpol, cpha, lsb, clk, wlen, rlen,
@@ -169,4 +170,4 @@ if __name__ == "__main__":
     # print(convert(dut))
 
     Tristate.lower = _TestTristate
-    run_simulation(dut, _test_gen(dut.bus), vcd_name="spi_master.vcd")
+    run_simulation(dut, _test_gen(dut.wbus), vcd_name="spi_master.vcd")

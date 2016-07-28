@@ -2,7 +2,7 @@ from itertools import product
 
 from migen import *
 from migen.genlib.fsm import FSM, NextState
-from misoc.interconnect import wishbone
+from misoc.interconnect import wishbone, csr
 
 
 class SPIClockGen(Module):
@@ -259,10 +259,8 @@ class SPIMaster(Module):
     data (address 0):
         M write/read data (reset=0)
     """
-    def __init__(self, pads, bus=None):
-        if bus is None:
-            bus = wishbone.Interface(data_width=32)
-        self.bus = bus
+    def __init__(self, pads, data_width=32, clock_width=8, bits_width=6):
+        self.wbus = wbus = wishbone.Interface(data_width=32)
 
         ###
 
@@ -281,7 +279,6 @@ class SPIMaster(Module):
             ("div_read", 8),
         ])
         config.offline.reset = 1
-        assert len(config) <= len(bus.dat_w)
 
         xfer = Record([
             ("cs", 16),
@@ -290,10 +287,9 @@ class SPIMaster(Module):
             ("read_length", 6),
             ("padding1", 2),
         ])
-        assert len(xfer) <= len(bus.dat_w)
 
         self.submodules.spi = spi = SPIMachine(
-            data_width=len(bus.dat_w),
+            data_width=len(wbus.dat_w),
             clock_width=len(config.div_read),
             bits_width=len(xfer.read_length))
 
@@ -303,9 +299,9 @@ class SPIMaster(Module):
         data_write = Signal.like(spi.reg.data)
 
         self.comb += [
-            bus.dat_r.eq(
+            wbus.dat_r.eq(
                 Array([data_read, xfer.raw_bits(), config.raw_bits()
-                       ])[bus.adr]),
+                       ])[wbus.adr]),
             spi.start.eq(pending & (~spi.cs | spi.done)),
             spi.clk_phase.eq(config.clk_phase),
             spi.reg.lsb.eq(config.lsb_first),
@@ -328,14 +324,14 @@ class SPIMaster(Module):
             # b) writing to non-data register
             # c) writing to data register and no pending transfer
             # d) writing to data register and pending and swapping buffers
-            bus.ack.eq(bus.cyc & bus.stb &
-                       (~bus.we | (bus.adr != 0) | ~pending | spi.done)),
-            If(bus.ack,
-                bus.ack.eq(0),
-                If(bus.we,
+            wbus.ack.eq(wbus.cyc & wbus.stb &
+                       (~wbus.we | (wbus.adr != 0) | ~pending | spi.done)),
+            If(wbus.ack,
+                wbus.ack.eq(0),
+                If(wbus.we,
                     Array([data_write, xfer.raw_bits(), config.raw_bits()
-                          ])[bus.adr].eq(bus.dat_w),
-                    If(bus.adr == 0,  # data register
+                          ])[wbus.adr].eq(wbus.dat_w),
+                    If(wbus.adr == 0,  # data register
                         pending.eq(1),
                     ),
                 ),

@@ -38,8 +38,11 @@ def SPI_READ_LENGTH(i):
 
 
 def _test_xfer(wbus, cbus, cs, wlen, rlen, wdata):
-    yield from wbus.write(SPI_XFER_ADDR, SPI_CS(cs) |
-                         SPI_WRITE_LENGTH(wlen) | SPI_READ_LENGTH(rlen))
+    yield from cbus.write(8, wlen)
+    yield from cbus.write(9, rlen)
+    yield from cbus.write(10, (cs >> 8) & 0xFF)
+    yield from cbus.write(11, cs & 0xFF)
+
     yield from cbus.write(4, (wdata >> 24) & 0xFF)
     yield from cbus.write(5, (wdata >> 16) & 0xFF)
     yield from cbus.write(6, (wdata >> 8) & 0xFF)

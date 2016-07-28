@@ -292,9 +292,13 @@ class SPIMaster(Module, AutoCSR):
         # CSR
         self._data_read = CSRStatus(data_width)
         self._data_write = CSRStorage(data_width, atomic_write=True)
+        self._xfer_len_read = CSRStorage(bits_width)
+        self._xfer_len_write = CSRStorage(bits_width)
+        self._device_sel = CSRStorage(len(pads.cs_n))
         self.data_width = CSRConstant(data_width)
         self.clock_width = CSRConstant(clock_width)
         self.bits_width = CSRConstant(bits_width)
+        self.device_width = CSRConstant(len(self._device_sel.storage))
 
         self.submodules.spi = spi = SPIMachine(
             data_width=len(wbus.dat_w),
@@ -321,9 +325,9 @@ class SPIMaster(Module, AutoCSR):
                 self._data_read.status.eq(spi.reg.data),
             ),
             If(spi.start,
-                cs.eq(xfer.cs),
-                spi.bits.n_write.eq(xfer.write_length),
-                spi.bits.n_read.eq(xfer.read_length),
+                cs.eq(self._device_sel.storage),
+                spi.bits.n_write.eq(self._xfer_len_write.storage),
+                spi.bits.n_read.eq(self._xfer_len_read.storage),
                 spi.reg.data.eq(self._data_write.storage),
                 pending.eq(0),
             ),

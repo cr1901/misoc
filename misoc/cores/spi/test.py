@@ -5,16 +5,22 @@ from misoc.cores.spi import SPIMaster
 from misoc.interconnect.csr_bus import *
 
 SPI_DATA_ADDR, SPI_XFER_ADDR, SPI_CONFIG_ADDR = range(3)
+
+# Config
 (
     SPI_OFFLINE,
-    SPI_ACTIVE,
-    SPI_PENDING,
     SPI_CS_POLARITY,
     SPI_CLK_POLARITY,
     SPI_CLK_PHASE,
     SPI_LSB_FIRST,
     SPI_HALF_DUPLEX,
-) = (1 << i for i in range(8))
+) = (1 << i for i in range(6))
+
+# Status
+(
+    SPI_ACTIVE,
+    SPI_PENDING,
+) = (1 << i for i in range(2))
 
 
 def SPI_DIV_WRITE(i):
@@ -51,7 +57,7 @@ def _test_xfer(wbus, cbus, cs, wlen, rlen, wdata):
 
 
 def _test_read(wbus, cbus, sync=SPI_ACTIVE | SPI_PENDING):
-    while (yield from wbus.read(SPI_CONFIG_ADDR)) & sync:
+    while (yield from cbus.read(13)) & sync:
         pass
     return ((yield from cbus.read(0)) << 24 |
             (yield from cbus.read(1)) << 16 |
@@ -60,10 +66,11 @@ def _test_read(wbus, cbus, sync=SPI_ACTIVE | SPI_PENDING):
 
 
 def _test_gen(wbus, cbus):
-    yield from wbus.write(SPI_CONFIG_ADDR, 0*SPI_CLK_POLARITY |
+    yield from cbus.write(12, 0*SPI_CLK_POLARITY |
                          1*SPI_CLK_PHASE | 0*SPI_LSB_FIRST |
-                         1*SPI_HALF_DUPLEX |
-                         SPI_DIV_WRITE(3) | SPI_DIV_READ(5))
+                         1*SPI_HALF_DUPLEX)
+    yield from cbus.write(14, 3) # W
+    yield from cbus.write(15, 5) # R
     yield from _test_xfer(wbus, cbus, 0b01, 4, 0, 0x90000000)
     print(hex((yield from _test_read(wbus, cbus))))
     yield from _test_xfer(wbus, cbus, 0b10, 0, 4, 0x90000000)

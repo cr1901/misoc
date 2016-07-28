@@ -265,6 +265,21 @@ class SPIMaster(Module, AutoCSR):
 
         ###
 
+        # CSR
+        configc = Record([
+            ("offline", 1),
+            ("cs_polarity", 1),
+            ("clk_polarity", 1),
+            ("clk_phase", 1),
+            ("lsb_first", 1),
+            ("half_duplex", 1),
+        ])
+
+        statusc = Record([
+            ("active", 1),
+            ("pending", 1),
+        ])
+
         # Wishbone
         config = Record([
             ("offline", 1),
@@ -295,6 +310,11 @@ class SPIMaster(Module, AutoCSR):
         self._xfer_len_read = CSRStorage(bits_width)
         self._xfer_len_write = CSRStorage(bits_width)
         self._device_sel = CSRStorage(len(pads.cs_n))
+        self._config = CSRStorage(6, reset=0x01) # See config record.
+        self._status = CSRStatus(2) # See status record. I don't think
+        # CSR supports bit-granularity read-only?
+        self._clk_div_read = CSRStorage(clock_width)
+        self._clk_div_write = CSRStorage(clock_width)
         self.data_width = CSRConstant(data_width)
         self.clock_width = CSRConstant(clock_width)
         self.bits_width = CSRConstant(bits_width)
@@ -314,11 +334,14 @@ class SPIMaster(Module, AutoCSR):
             wbus.dat_r.eq(
                 Array([data_read, xfer.raw_bits(), config.raw_bits()
                        ])[wbus.adr]),
+            configc.raw_bits().eq(self._config.storage),
+            self._status.status.eq(statusc.raw_bits()),
+
             spi.start.eq(pending & (~spi.cs | spi.done)),
-            spi.clk_phase.eq(config.clk_phase),
-            spi.reg.lsb.eq(config.lsb_first),
-            spi.div_write.eq(config.div_write),
-            spi.div_read.eq(config.div_read),
+            spi.clk_phase.eq(configc.clk_phase),
+            spi.reg.lsb.eq(configc.lsb_first),
+            spi.div_write.eq(self._clk_div_write.storage),
+            spi.div_read.eq(self._clk_div_read.storage),
         ]
         self.sync += [
             If(spi.done,
@@ -350,8 +373,8 @@ class SPIMaster(Module, AutoCSR):
                 pending.eq(1),
             ),
 
-            config.active.eq(spi.cs),
-            config.pending.eq(pending),
+            statusc.active.eq(spi.cs),
+            statusc.pending.eq(pending),
         ]
 
         # I/O
@@ -359,24 +382,24 @@ class SPIMaster(Module, AutoCSR):
             cs_n_t = TSTriple(len(pads.cs_n))
             self.specials += cs_n_t.get_tristate(pads.cs_n)
             self.comb += [
-                cs_n_t.oe.eq(~config.offline),
+                cs_n_t.oe.eq(~configc.offline),
                 cs_n_t.o.eq((cs & Replicate(spi.cs, len(cs))) ^
-                            Replicate(~config.cs_polarity, len(cs))),
+                            Replicate(~configc.cs_polarity, len(cs))),
             ]
 
         clk_t = TSTriple()
         self.specials += clk_t.get_tristate(pads.clk)
         self.comb += [
-            clk_t.oe.eq(~config.offline),
-            clk_t.o.eq((spi.cg.clk & spi.cs) ^ config.clk_polarity),
+            clk_t.oe.eq(~configc.offline),
+            clk_t.o.eq((spi.cg.clk & spi.cs) ^ configc.clk_polarity),
         ]
 
         mosi_t = TSTriple()
         self.specials += mosi_t.get_tristate(pads.mosi)
         self.comb += [
-            mosi_t.oe.eq(~config.offline & spi.cs &
-                         (spi.oe | ~config.half_duplex)),
+            mosi_t.oe.eq(~configc.offline & spi.cs &
+                         (spi.oe | ~configc.half_duplex)),
             mosi_t.o.eq(spi.reg.o),
-            spi.reg.i.eq(Mux(config.half_duplex, mosi_t.i,
+            spi.reg.i.eq(Mux(configc.half_duplex, mosi_t.i,
                              getattr(pads, "miso", mosi_t.i))),
         ]

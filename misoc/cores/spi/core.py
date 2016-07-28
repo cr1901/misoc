@@ -2,7 +2,8 @@ from itertools import product
 
 from migen import *
 from migen.genlib.fsm import FSM, NextState
-from misoc.interconnect import wishbone, csr
+from misoc.interconnect import wishbone
+from misoc.interconnect.csr import *
 
 
 class SPIClockGen(Module):
@@ -160,7 +161,7 @@ class SPIMachine(Module):
         ]
 
 
-class SPIMaster(Module):
+class SPIMaster(Module, AutoCSR):
     """SPI Master.
 
     Notes:
@@ -260,7 +261,7 @@ class SPIMaster(Module):
         M write/read data (reset=0)
     """
     def __init__(self, pads, data_width=32, clock_width=8, bits_width=6):
-        self.wbus = wbus = wishbone.Interface(data_width=32)
+        self.wbus = wbus = wishbone.Interface(data_width=data_width)
 
         ###
 
@@ -288,6 +289,13 @@ class SPIMaster(Module):
             ("padding1", 2),
         ])
 
+        # CSR
+        self._data_read = CSRStatus(data_width)
+        self._data_write = CSRStorage(data_width, atomic_write=True)
+        self.data_width = CSRConstant(data_width)
+        self.clock_width = CSRConstant(clock_width)
+        self.bits_width = CSRConstant(bits_width)
+
         self.submodules.spi = spi = SPIMachine(
             data_width=len(wbus.dat_w),
             clock_width=len(config.div_read),
@@ -307,16 +315,19 @@ class SPIMaster(Module):
             spi.reg.lsb.eq(config.lsb_first),
             spi.div_write.eq(config.div_write),
             spi.div_read.eq(config.div_read),
+
+            If(self._data_write.re == 1,
+                pending.eq(1)),
         ]
         self.sync += [
             If(spi.done,
-                data_read.eq(spi.reg.data),
+                self._data_read.status.eq(spi.reg.data),
             ),
             If(spi.start,
                 cs.eq(xfer.cs),
                 spi.bits.n_write.eq(xfer.write_length),
                 spi.bits.n_read.eq(xfer.read_length),
-                spi.reg.data.eq(data_write),
+                spi.reg.data.eq(self._data_write.storage),
                 pending.eq(0),
             ),
             # wb.ack a transaction if any of the following:
@@ -331,11 +342,13 @@ class SPIMaster(Module):
                 If(wbus.we,
                     Array([data_write, xfer.raw_bits(), config.raw_bits()
                           ])[wbus.adr].eq(wbus.dat_w),
-                    If(wbus.adr == 0,  # data register
-                        pending.eq(1),
-                    ),
                 ),
             ),
+
+            If(self._data_write.re == 1,
+                pending.eq(1),
+            ),
+
             config.active.eq(spi.cs),
             config.pending.eq(pending),
         ]

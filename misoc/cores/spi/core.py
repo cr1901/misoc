@@ -261,7 +261,7 @@ class SPIMaster(Module, AutoCSR):
         M write/read data (reset=0)
     """
     def __init__(self, pads, data_width=32, clock_width=8, bits_width=6):
-        configc = Record([
+        config = Record([
             ("offline", 1),
             ("cs_polarity", 1),
             ("clk_polarity", 1),
@@ -270,7 +270,7 @@ class SPIMaster(Module, AutoCSR):
             ("half_duplex", 1),
         ])
 
-        statusc = Record([
+        status = Record([
             ("active", 1),
             ("pending", 1),
         ])
@@ -303,12 +303,12 @@ class SPIMaster(Module, AutoCSR):
         ###
 
         self.comb += [
-            configc.raw_bits().eq(self._config.storage),
-            self._status.status.eq(statusc.raw_bits()),
+            config.raw_bits().eq(self._config.storage),
+            self._status.status.eq(status.raw_bits()),
 
             spi.start.eq(pending & (~spi.cs | spi.done)),
-            spi.clk_phase.eq(configc.clk_phase),
-            spi.reg.lsb.eq(configc.lsb_first),
+            spi.clk_phase.eq(config.clk_phase),
+            spi.reg.lsb.eq(config.lsb_first),
             spi.div_write.eq(self._clk_div_write.storage),
             spi.div_read.eq(self._clk_div_read.storage),
 
@@ -318,7 +318,7 @@ class SPIMaster(Module, AutoCSR):
             Else(
                 pending.eq(pending0)
             ),
-            statusc.pending.eq(pending),
+            status.pending.eq(pending),
         ]
         self.sync += [
             If(spi.done,
@@ -340,7 +340,7 @@ class SPIMaster(Module, AutoCSR):
                 pending0.eq(1),
             ),
 
-            statusc.active.eq(spi.cs),
+            status.active.eq(spi.cs),
         ]
 
         # I/O
@@ -348,24 +348,24 @@ class SPIMaster(Module, AutoCSR):
             cs_n_t = TSTriple(len(pads.cs_n))
             self.specials += cs_n_t.get_tristate(pads.cs_n)
             self.comb += [
-                cs_n_t.oe.eq(~configc.offline),
+                cs_n_t.oe.eq(~config.offline),
                 cs_n_t.o.eq((cs & Replicate(spi.cs, len(cs))) ^
-                            Replicate(~configc.cs_polarity, len(cs))),
+                            Replicate(~config.cs_polarity, len(cs))),
             ]
 
         clk_t = TSTriple()
         self.specials += clk_t.get_tristate(pads.clk)
         self.comb += [
-            clk_t.oe.eq(~configc.offline),
-            clk_t.o.eq((spi.cg.clk & spi.cs) ^ configc.clk_polarity),
+            clk_t.oe.eq(~config.offline),
+            clk_t.o.eq((spi.cg.clk & spi.cs) ^ config.clk_polarity),
         ]
 
         mosi_t = TSTriple()
         self.specials += mosi_t.get_tristate(pads.mosi)
         self.comb += [
-            mosi_t.oe.eq(~configc.offline & spi.cs &
-                         (spi.oe | ~configc.half_duplex)),
+            mosi_t.oe.eq(~config.offline & spi.cs &
+                         (spi.oe | ~config.half_duplex)),
             mosi_t.o.eq(spi.reg.o),
-            spi.reg.i.eq(Mux(configc.half_duplex, mosi_t.i,
+            spi.reg.i.eq(Mux(config.half_duplex, mosi_t.i,
                              getattr(pads, "miso", mosi_t.i))),
         ]

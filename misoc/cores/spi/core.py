@@ -227,12 +227,23 @@ class SPIMaster(Module, AutoCSR):
         * If desired, change xfer register for the next transfer.
         * If desired, write data queuing the next (possibly chained) transfer.
 
-    Register address and bit map:
+    Register address and bit map (descending addresses- use generated/csr.h
+    for addresses and width of variable-width registers, marked with "M"):
 
-    config (address 2):
+    clk_div_write:
+        M counter load value to divide this module's clock
+        to generate the SPI write clk (reset=0)
+        f_clk/f_spi_write == div_write + 2
+
+    clk_div_read:
+        M ditto for the read clock
+
+    status:
+        1 active: cs/transfer active
+        1 pending: transfer pending in intermediate buffer
+
+    config:
         1 offline: all pins high-z (reset=1)
-        1 active: cs/transfer active (read-only)
-        1 pending: transfer pending in intermediate buffer (read-only)
         1 cs_polarity: active level of chip select (reset=0)
         1 clk_polarity: idle level of clk (reset=0)
         1 clk_phase: first edge after cs assertion to sample data on (reset=0)
@@ -244,20 +255,16 @@ class SPIMaster(Module, AutoCSR):
             There is never a clk edge during a cs edge.
         1 lsb_first: LSB is the first bit on the wire (reset=0)
         1 half_duplex: 3-wire SPI, in/out on mosi (reset=0)
-        8 undefined
-        8 div_write: counter load value to divide this module's clock
-            to generate the SPI write clk (reset=0)
-            f_clk/f_spi_write == div_write + 2
-        8 div_read: ditto for the read clock
 
-    xfer (address 1):
-        16 cs: active high bit mask of chip selects to assert (reset=0)
-        6 write_len: 0-M bits (reset=0)
-        2 undefined
-        6 read_len: 0-M bits (reset=0)
-        2 undefined
+    device_sel:
+        M active high bit mask of chip selects to assert (reset=0)
 
-    data (address 0):
+    6 xfer_len_write:
+    6 xfer_len_read:
+        0-M bits (reset=0)
+
+    data_write:
+    data_read:
         M write/read data (reset=0)
     """
     def __init__(self, pads, data_width=32, clock_width=8, bits_width=6):

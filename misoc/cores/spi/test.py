@@ -58,8 +58,8 @@ def _test_gen(bus):
     yield from bus.write(SPI_CONFIG, 0*SPI_CLK_POLARITY |
                          1*SPI_CLK_PHASE | 0*SPI_LSB_FIRST |
                          1*SPI_HALF_DUPLEX)
-    yield from bus.write(SPI_CLK_DIV_READ, 5) # W
-    yield from bus.write(SPI_CLK_DIV_WRITE, 3) # R
+    yield from bus.write(SPI_CLK_DIV_READ, 5)
+    yield from bus.write(SPI_CLK_DIV_WRITE, 3)
     yield from _test_xfer(bus, 0b01, 4, 0, 0x90000000)
     print(hex((yield from _test_read(bus))))
     yield from _test_xfer(bus, 0b10, 0, 4, 0x90000000)
@@ -75,10 +75,11 @@ def _test_gen(bus):
 
     for cpol, cpha, lsb, clk in product(
             (0, 1), (0, 1), (0, 1), (0, 1)):
-        yield from bus.write(SPI_CONFIG_ADDR,
+        yield from bus.write(SPI_CONFIG,
                              cpol*SPI_CLK_POLARITY | cpha*SPI_CLK_PHASE |
-                             lsb*SPI_LSB_FIRST | SPI_DIV_WRITE(clk) |
-                             SPI_DIV_READ(clk))
+                             lsb*SPI_LSB_FIRST)
+        yield from bus.write(SPI_CLK_DIV_READ, clk)
+        yield from bus.write(SPI_CLK_DIV_WRITE, clk)
         for wlen, rlen, wdata in product((0, 8, 32), (0, 8, 32),
                                          (0, 0xffffffff, 0xdeadbeef,
                                           0x5555aaaa)):

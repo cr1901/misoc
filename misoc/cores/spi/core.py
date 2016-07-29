@@ -261,11 +261,6 @@ class SPIMaster(Module, AutoCSR):
         M write/read data (reset=0)
     """
     def __init__(self, pads, data_width=32, clock_width=8, bits_width=6):
-        self.wbus = wbus = wishbone.Interface(data_width=data_width)
-
-        ###
-
-        # CSR
         configc = Record([
             ("offline", 1),
             ("cs_polarity", 1),
@@ -278,30 +273,6 @@ class SPIMaster(Module, AutoCSR):
         statusc = Record([
             ("active", 1),
             ("pending", 1),
-        ])
-
-        # Wishbone
-        config = Record([
-            ("offline", 1),
-            ("active", 1),
-            ("pending", 1),
-            ("cs_polarity", 1),
-            ("clk_polarity", 1),
-            ("clk_phase", 1),
-            ("lsb_first", 1),
-            ("half_duplex", 1),
-            ("padding", 8),
-            ("div_write", 8),
-            ("div_read", 8),
-        ])
-        config.offline.reset = 1
-
-        xfer = Record([
-            ("cs", 16),
-            ("write_length", 6),
-            ("padding0", 2),
-            ("read_length", 6),
-            ("padding1", 2),
         ])
 
         # CSR
@@ -321,20 +292,17 @@ class SPIMaster(Module, AutoCSR):
         self.device_width = CSRConstant(len(self._device_sel.storage))
 
         self.submodules.spi = spi = SPIMachine(
-            data_width=len(wbus.dat_w),
-            clock_width=len(config.div_read),
-            bits_width=len(xfer.read_length))
+            data_width=data_width,
+            clock_width=clock_width,
+            bits_width=bits_width)
 
         pending0 = Signal(1)
         pending = Signal(1)
-        cs = Signal.like(xfer.cs)
-        data_read = Signal.like(spi.reg.data)
-        data_write = Signal.like(spi.reg.data)
+        cs = Signal.like(self._device_sel.storage)
+
+        ###
 
         self.comb += [
-            wbus.dat_r.eq(
-                Array([data_read, xfer.raw_bits(), config.raw_bits()
-                       ])[wbus.adr]),
             configc.raw_bits().eq(self._config.storage),
             self._status.status.eq(statusc.raw_bits()),
 
@@ -363,20 +331,10 @@ class SPIMaster(Module, AutoCSR):
                 spi.reg.data.eq(self._data_write.storage),
                 pending0.eq(0),
             ),
-            # wb.ack a transaction if any of the following:
-            # a) reading,
-            # b) writing to non-data register
-            # c) writing to data register and no pending transfer
-            # d) writing to data register and pending and swapping buffers
-            wbus.ack.eq(wbus.cyc & wbus.stb &
-                       (~wbus.we | (wbus.adr != 0) | ~pending | spi.done)),
-            If(wbus.ack,
-                wbus.ack.eq(0),
-                If(wbus.we,
-                    Array([data_write, xfer.raw_bits(), config.raw_bits()
-                          ])[wbus.adr].eq(wbus.dat_w),
-                ),
-            ),
+
+            # CSR bus will honor all reads and writes. A write to the data_write
+            # register when pending is active will overwrite the existing data.
+            # A user must query the pending status register before writing.
 
             If(self._data_write.re == 1,
                 pending0.eq(1),

@@ -4,7 +4,16 @@ from itertools import product
 from misoc.cores.spi import SPIMaster
 from misoc.interconnect.csr_bus import *
 
-SPI_DATA_ADDR, SPI_XFER_ADDR, SPI_CONFIG_ADDR = range(3)
+(
+    SPI_DATA_READ,
+    SPI_DATA_WRITE,
+    SPI_XFER_LEN_READ,
+    SPI_XFER_LEN_WRITE,
+    SPI_SEL, SPI_CONFIG,
+    SPI_STATUS,
+    SPI_CLK_DIV_READ,
+    SPI_CLK_DIV_WRITE
+) = (0, 4, 8, 9, 10, 11, 12, 13, 14)
 
 # Config
 (
@@ -25,33 +34,32 @@ SPI_DATA_ADDR, SPI_XFER_ADDR, SPI_CONFIG_ADDR = range(3)
 
 
 def _test_xfer(bus, cs, wlen, rlen, wdata):
-    yield from bus.write(8, wlen)
-    yield from bus.write(9, rlen)
-    yield from bus.write(10, (cs >> 8) & 0xFF)
-    yield from bus.write(11, cs & 0xFF)
+    yield from bus.write(SPI_XFER_LEN_READ, rlen)
+    yield from bus.write(SPI_XFER_LEN_WRITE, wlen)
+    yield from bus.write(SPI_SEL, cs & 0xFF)
 
-    yield from bus.write(4, (wdata >> 24) & 0xFF)
-    yield from bus.write(5, (wdata >> 16) & 0xFF)
-    yield from bus.write(6, (wdata >> 8) & 0xFF)
-    yield from bus.write(7, wdata & 0xFF)
+    yield from bus.write(SPI_DATA_WRITE, (wdata >> 24) & 0xFF)
+    yield from bus.write(SPI_DATA_WRITE + 1, (wdata >> 16) & 0xFF)
+    yield from bus.write(SPI_DATA_WRITE + 2, (wdata >> 8) & 0xFF)
+    yield from bus.write(SPI_DATA_WRITE + 3, wdata & 0xFF)
     yield
 
 
 def _test_read(bus, sync=SPI_ACTIVE | SPI_PENDING):
-    while (yield from bus.read(12)) & sync:
+    while (yield from bus.read(SPI_STATUS)) & sync:
         pass
-    return ((yield from bus.read(0)) << 24 |
-            (yield from bus.read(1)) << 16 |
-            (yield from bus.read(2)) << 8 |
-            (yield from bus.read(3)))
+    return ((yield from bus.read(SPI_DATA_READ)) << 24 |
+            (yield from bus.read(SPI_DATA_READ + 1)) << 16 |
+            (yield from bus.read(SPI_DATA_READ + 2)) << 8 |
+            (yield from bus.read(SPI_DATA_READ + 3)))
 
 
 def _test_gen(bus):
-    yield from bus.write(11, 0*SPI_CLK_POLARITY |
+    yield from bus.write(SPI_CONFIG, 0*SPI_CLK_POLARITY |
                          1*SPI_CLK_PHASE | 0*SPI_LSB_FIRST |
                          1*SPI_HALF_DUPLEX)
-    yield from bus.write(13, 3) # W
-    yield from bus.write(14, 5) # R
+    yield from bus.write(SPI_CLK_DIV_READ, 5) # W
+    yield from bus.write(SPI_CLK_DIV_WRITE, 3) # R
     yield from _test_xfer(bus, 0b01, 4, 0, 0x90000000)
     print(hex((yield from _test_read(bus))))
     yield from _test_xfer(bus, 0b10, 0, 4, 0x90000000)

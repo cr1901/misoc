@@ -4,28 +4,24 @@ from itertools import product
 from misoc.cores.spi import SPIMaster
 from misoc.interconnect.csr_bus import *
 
+
 (
     SPI_DATA_READ,
     SPI_DATA_WRITE,
     SPI_XFER_LEN_READ,
     SPI_XFER_LEN_WRITE,
     SPI_SEL,
-    SPI_CONFIG,
-    SPI_ACTIVE,
-    SPI_PENDING,
-    SPI_CLK_DIV_READ,
-    SPI_CLK_DIV_WRITE
-) = (0, 4, 8, 9, 10, 11, 12, 13, 14, 15)
-
-# Config
-(
     SPI_OFFLINE,
     SPI_CS_POLARITY,
     SPI_CLK_POLARITY,
     SPI_CLK_PHASE,
     SPI_LSB_FIRST,
     SPI_HALF_DUPLEX,
-) = (1 << i for i in range(6))
+    SPI_ACTIVE,
+    SPI_PENDING,
+    SPI_CLK_DIV_READ,
+    SPI_CLK_DIV_WRITE
+) = (0, 4, *(i for i in range(8, 21)))
 
 
 def _test_xfer(bus, cs, wlen, rlen, wdata):
@@ -66,9 +62,12 @@ def _test_pending(bus):
 
 
 def _test_gen(bus):
-    yield from bus.write(SPI_CONFIG, 0*SPI_CLK_POLARITY |
-                         1*SPI_CLK_PHASE | 0*SPI_LSB_FIRST |
-                         1*SPI_HALF_DUPLEX)
+    yield from bus.write(SPI_OFFLINE, 0)
+    yield from bus.write(SPI_CS_POLARITY, 0)
+    yield from bus.write(SPI_CLK_POLARITY, 0)
+    yield from bus.write(SPI_CLK_PHASE, 1)
+    yield from bus.write(SPI_LSB_FIRST, 0)
+    yield from bus.write(SPI_HALF_DUPLEX, 1)
     yield from bus.write(SPI_CLK_DIV_READ, 5)
     yield from bus.write(SPI_CLK_DIV_WRITE, 3)
     yield from _test_xfer(bus, 0b01, 4, 0, 0x90000000)
@@ -84,11 +83,12 @@ def _test_gen(bus):
     return
 
 
+    yield from bus.write(SPI_HALF_DUPLEX, 0)
     for cpol, cpha, lsb, clk in product(
             (0, 1), (0, 1), (0, 1), (0, 1)):
-        yield from bus.write(SPI_CONFIG,
-                             cpol*SPI_CLK_POLARITY | cpha*SPI_CLK_PHASE |
-                             lsb*SPI_LSB_FIRST)
+        yield from bus.write(SPI_CLK_POLARITY, cpol)
+        yield from bus.write(SPI_CLK_PHASE, cpha)
+        yield from bus.write(SPI_LSB_FIRST, lsb)
         yield from bus.write(SPI_CLK_DIV_READ, clk)
         yield from bus.write(SPI_CLK_DIV_WRITE, clk)
         for wlen, rlen, wdata in product((0, 8, 32), (0, 8, 32),

@@ -176,13 +176,13 @@ class SPIMaster(Module, AutoCSR):
           If it is one-hot, asserting multiple slaves should only be attempted
           if miso is either not connected between slaves, or open collector,
           or correctly multiplexed externally.
-        * If config.cs_polarity == 0 (cs active low, the default),
+        * If self._cs_polarity == 0 (cs active low, the default),
           "cs_n all deasserted" means "all cs_n bits high".
         * cs is not mandatory in pads. Framing and chip selection can also
           be handled independently through other means.
         * If there is a miso wire in pads, the input and output can be done
           with two signals (a.k.a. 4-wire SPI), else mosi must be used for
-          both output and input (a.k.a. 3-wire SPI) and config.half_duplex
+          both output and input (a.k.a. 3-wire SPI) and self._half_duplex
           must to be set when reading data is desired.
         * For 4-wire SPI only the sum of read_length and write_length matters.
           The behavior is the same no matter how the total transfer length is
@@ -191,14 +191,14 @@ class SPIMaster(Module, AutoCSR):
           "shift_out" clk edge corresponding to bit write_length + 1 of the
           transfer.
         * The first bit output on mosi is always the MSB/LSB (depending on
-          config.lsb_first) of the data register, independent of
+          self._lsb_first) of the data register, independent of
           xfer.write_len. The last bit input from miso always ends up in
           the LSB/MSB (respectively) of the data register, independent of
           read_len.
         * Data output on mosi in 4-wire SPI during the read cycles is what
           is found in the data register at the time.
           Data in the data register outside the least/most (depending
-          on config.lsb_first) significant read_length bits is what is
+          on self._lsb_first) significant read_length bits is what is
           seen on miso during the write cycles.
         * The SPI data register is double-buffered: Once a transfer has
           started, new write data can be written, queuing a new transfer.

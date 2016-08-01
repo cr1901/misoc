@@ -246,7 +246,7 @@ class SPIMaster(Module, AutoCSR):
         self._data_write = CSRStorage(data_width, atomic_write=True)
         self._xfer_len_read = CSRStorage(bits_width)
         self._xfer_len_write = CSRStorage(bits_width)
-        self._device_sel = CSRStorage(len(pads.cs_n))
+        self._cs = CSRStorage(len(pads.cs_n))
         self._config = CSRStorage(6, reset=0x01) # See config record.
         self._status = CSRStatus(2) # See status record. I don't think
         # CSR supports bit-granularity read-only?
@@ -255,7 +255,7 @@ class SPIMaster(Module, AutoCSR):
         self.data_width = CSRConstant(data_width)
         self.clock_width = CSRConstant(clock_width)
         self.bits_width = CSRConstant(bits_width)
-        self.device_width = CSRConstant(len(self._device_sel.storage))
+        self.cs_width = CSRConstant(len(self._cs.storage))
 
         self.submodules.spi = spi = SPIMachine(
             data_width=data_width,
@@ -264,7 +264,7 @@ class SPIMaster(Module, AutoCSR):
 
         pending0 = Signal(1)
         pending = Signal(1)
-        cs = Signal.like(self._device_sel.storage)
+        cs = Signal.like(self._cs.storage)
 
         ###
 
@@ -291,7 +291,7 @@ class SPIMaster(Module, AutoCSR):
                 self._data_read.status.eq(spi.reg.data),
             ),
             If(spi.start,
-                cs.eq(self._device_sel.storage),
+                cs.eq(self._cs.storage),
                 spi.bits.n_write.eq(self._xfer_len_write.storage),
                 spi.bits.n_read.eq(self._xfer_len_read.storage),
                 spi.reg.data.eq(self._data_write.storage),

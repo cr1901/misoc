@@ -2,7 +2,6 @@ from itertools import product
 
 from migen import *
 from migen.genlib.fsm import FSM, NextState
-from misoc.interconnect import wishbone
 from misoc.interconnect.csr import *
 
 

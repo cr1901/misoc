@@ -9,11 +9,13 @@ from misoc.interconnect.csr_bus import *
     SPI_DATA_WRITE,
     SPI_XFER_LEN_READ,
     SPI_XFER_LEN_WRITE,
-    SPI_SEL, SPI_CONFIG,
-    SPI_STATUS,
+    SPI_SEL,
+    SPI_CONFIG,
+    SPI_ACTIVE,
+    SPI_PENDING,
     SPI_CLK_DIV_READ,
     SPI_CLK_DIV_WRITE
-) = (0, 4, 8, 9, 10, 11, 12, 13, 14)
+) = (0, 4, 8, 9, 10, 11, 12, 13, 14, 15)
 
 # Config
 (
@@ -24,13 +26,6 @@ from misoc.interconnect.csr_bus import *
     SPI_LSB_FIRST,
     SPI_HALF_DUPLEX,
 ) = (1 << i for i in range(6))
-
-
-# Status
-(
-    SPI_ACTIVE,
-    SPI_PENDING,
-) = (1 << i for i in range(2))
 
 
 def _test_xfer(bus, cs, wlen, rlen, wdata):
@@ -45,13 +40,29 @@ def _test_xfer(bus, cs, wlen, rlen, wdata):
     yield
 
 
-def _test_read(bus, sync=SPI_ACTIVE | SPI_PENDING):
-    while (yield from bus.read(SPI_STATUS)) & sync:
-        pass
+def _read_data(bus):
     return ((yield from bus.read(SPI_DATA_READ)) << 24 |
-            (yield from bus.read(SPI_DATA_READ + 1)) << 16 |
-            (yield from bus.read(SPI_DATA_READ + 2)) << 8 |
-            (yield from bus.read(SPI_DATA_READ + 3)))
+        (yield from bus.read(SPI_DATA_READ + 1)) << 16 |
+        (yield from bus.read(SPI_DATA_READ + 2)) << 8 |
+        (yield from bus.read(SPI_DATA_READ + 3)))
+
+
+def _test_read(bus):
+    while (yield from bus.read(SPI_ACTIVE)) | (yield from bus.read(SPI_PENDING)):
+        pass
+    return (yield from _read_data(bus))
+
+
+def _test_active(bus):
+    while (yield from bus.read(SPI_ACTIVE)):
+        pass
+    return (yield from _read_data(bus))
+
+
+def _test_pending(bus):
+    while (yield from bus.read(SPI_PENDING)):
+        pass
+    return (yield from _read_data(bus))
 
 
 def _test_gen(bus):
@@ -68,8 +79,8 @@ def _test_gen(bus):
     print(hex((yield from _test_read(bus))))
     yield from _test_xfer(bus, 0b01, 8, 32, 0x87654321)
     yield from _test_xfer(bus, 0b01, 0, 32, 0x12345678)
-    print(hex((yield from _test_read(bus, SPI_PENDING))))
-    print(hex((yield from _test_read(bus, SPI_ACTIVE))))
+    print(hex((yield from _test_pending(bus))))
+    print(hex((yield from _test_active(bus))))
     return
 
 

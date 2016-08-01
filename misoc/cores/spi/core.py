@@ -236,11 +236,6 @@ class SPIMaster(Module, AutoCSR):
             ("half_duplex", 1),
         ])
 
-        status = Record([
-            ("active", 1),
-            ("pending", 1),
-        ])
-
         # CSR
         self._data_read = CSRStatus(data_width)
         self._data_write = CSRStorage(data_width, atomic_write=True)
@@ -248,8 +243,8 @@ class SPIMaster(Module, AutoCSR):
         self._xfer_len_write = CSRStorage(bits_width)
         self._cs = CSRStorage(len(pads.cs_n))
         self._config = CSRStorage(6, reset=0x01) # See config record.
-        self._status = CSRStatus(2) # See status record. I don't think
-        # CSR supports bit-granularity read-only?
+        self._active = CSRStatus()
+        self._pending = CSRStatus()
         self._clk_div_read = CSRStorage(clock_width)
         self._clk_div_write = CSRStorage(clock_width)
         self.data_width = CSRConstant(data_width)
@@ -270,7 +265,6 @@ class SPIMaster(Module, AutoCSR):
 
         self.comb += [
             config.raw_bits().eq(self._config.storage),
-            self._status.status.eq(status.raw_bits()),
 
             spi.start.eq(pending & (~spi.cs | spi.done)),
             spi.clk_phase.eq(config.clk_phase),
@@ -284,7 +278,7 @@ class SPIMaster(Module, AutoCSR):
             Else(
                 pending.eq(pending0)
             ),
-            status.pending.eq(pending),
+            self._pending.status.eq(pending),
         ]
         self.sync += [
             If(spi.done,
@@ -306,7 +300,7 @@ class SPIMaster(Module, AutoCSR):
                 pending0.eq(1),
             ),
 
-            status.active.eq(spi.cs),
+            self._active.status.eq(spi.cs),
         ]
 
         # I/O

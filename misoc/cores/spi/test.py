@@ -21,7 +21,7 @@ from misoc.interconnect.csr_bus import *
     SPI_PENDING,
     SPI_CLK_DIV_READ,
     SPI_CLK_DIV_WRITE
-) = (0, 4, *(i for i in range(8, 21)))
+) = (0, 4) + tuple(i for i in range(8, 21))
 
 
 def _test_xfer(bus, cs, wlen, rlen, wdata):

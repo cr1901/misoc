@@ -44,7 +44,10 @@ def _read_data(bus):
 
 
 def _test_read(bus):
-    while (yield from bus.read(SPI_ACTIVE)) | (yield from bus.read(SPI_PENDING)):
+    # Order matters: Check SPI_PENDING before SPI_ACTIVE, otherwise
+    # we could correctly read 0 from SPI_ACTIVE, and then read 0
+    # from SPI_PENDING the next cycle!
+    while (yield from bus.read(SPI_PENDING)) | (yield from bus.read(SPI_ACTIVE)):
         pass
     return (yield from _read_data(bus))
 

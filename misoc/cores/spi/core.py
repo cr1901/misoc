@@ -253,7 +253,6 @@ class SPIMaster(Module, AutoCSR):
             clock_width=clock_width,
             bits_width=bits_width)
 
-        pending0 = Signal(1)
         pending = Signal(1)
         cs = Signal.like(self._cs.storage)
 
@@ -265,14 +264,8 @@ class SPIMaster(Module, AutoCSR):
             spi.reg.lsb.eq(self._lsb_first.storage),
             spi.div_write.eq(self._clk_div_write.storage),
             spi.div_read.eq(self._clk_div_read.storage),
-
-            If(self._data_write.re,
-                pending.eq(1)
-            ).
-            Else(
-                pending.eq(pending0)
-            ),
             self._pending.status.eq(pending),
+            self._active.status.eq(spi.cs),
         ]
         self.sync += [
             If(spi.done,
@@ -283,7 +276,7 @@ class SPIMaster(Module, AutoCSR):
                 spi.bits.n_write.eq(self._xfer_len_write.storage),
                 spi.bits.n_read.eq(self._xfer_len_read.storage),
                 spi.reg.data.eq(self._data_write.storage),
-                pending0.eq(0),
+                pending.eq(0),
             ),
 
             # CSR bus will honor all reads and writes. A write to the data_write
@@ -291,10 +284,8 @@ class SPIMaster(Module, AutoCSR):
             # A user must query the pending status register before writing.
 
             If(self._data_write.re == 1,
-                pending0.eq(1),
+                pending.eq(1),
             ),
-
-            self._active.status.eq(spi.cs),
         ]
 
         # I/O

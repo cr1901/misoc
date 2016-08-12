@@ -1,5 +1,3 @@
-from itertools import product
-
 from migen import *
 from migen.genlib.fsm import FSM, NextState
 from misoc.interconnect.csr import *
@@ -279,9 +277,10 @@ class SPIMaster(Module, AutoCSR):
                 pending.eq(0),
             ),
 
-            # CSR bus will honor all reads and writes. A write to the data_write
-            # register when pending is active will overwrite the existing data.
-            # A user must query the pending status register before writing.
+            # CSR bus will honor all reads and writes. A write to the
+            # data_write register when pending is active will overwrite
+            # the existing data. A user must query the pending status
+            # register before writing.
 
             If(self._data_write.re == 1,
                 pending.eq(1),

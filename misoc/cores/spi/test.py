@@ -38,16 +38,17 @@ def _test_xfer(bus, cs, wlen, rlen, wdata):
 
 def _read_data(bus):
     return ((yield from bus.read(SPI_DATA_READ)) << 24 |
-        (yield from bus.read(SPI_DATA_READ + 1)) << 16 |
-        (yield from bus.read(SPI_DATA_READ + 2)) << 8 |
-        (yield from bus.read(SPI_DATA_READ + 3)))
+            (yield from bus.read(SPI_DATA_READ + 1)) << 16 |
+            (yield from bus.read(SPI_DATA_READ + 2)) << 8 |
+            (yield from bus.read(SPI_DATA_READ + 3)))
 
 
 def _test_read(bus):
     # Order matters: Check SPI_PENDING before SPI_ACTIVE, otherwise
     # we could correctly read 0 from SPI_ACTIVE, and then read 0
     # from SPI_PENDING the next cycle!
-    while (yield from bus.read(SPI_PENDING)) | (yield from bus.read(SPI_ACTIVE)):
+    while (yield from bus.read(SPI_PENDING)) | \
+          (yield from bus.read(SPI_ACTIVE)):
         pass
     return (yield from _read_data(bus))
 
@@ -85,7 +86,6 @@ def _test_gen(bus):
     print(hex((yield from _test_active(bus))))
     return
 
-
     yield from bus.write(SPI_HALF_DUPLEX, 0)
     for cpol, cpha, lsb, clk in product(
             (0, 1), (0, 1), (0, 1), (0, 1)):
@@ -100,8 +100,8 @@ def _test_gen(bus):
             xfer_len = wlen + rlen
             yield from _test_xfer(bus, 0b1, wlen, rlen, wdata)
             if cpha == 1 and xfer_len == 0:
-                expected_rdata = rdata # Write will not register.
-                                       # Use prev rdata.
+                expected_rdata = rdata  # Write will not register.
+                # Use prev rdata.
             else:
                 expected_rdata = _simulate_shifts(wdata, xfer_len, lsb, 32)
             rdata = (yield from _test_read(bus))
